@@ -338,7 +338,7 @@ HTML_PAGE = """
     <div class="hero">
         <h1>🍽️ AI školní jídelna</h1>
         <p>Flask + PostgreSQL + vzdálené AI API. Dotaz se odešle AI a uloží do databáze.</p>
-        <div class="author">Autor: Ondřej Diviš</div>
+        <div class="author">Autor: Ondrej Divis 13/04/2026</div>
         <div class="userbox">
             Přihlášený uživatel: <b>{{ username }}</b>
             <a class="logout-link" href="/logout">Odhlásit</a>
