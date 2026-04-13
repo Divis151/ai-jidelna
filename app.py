@@ -14,9 +14,11 @@ import requests
 app = Flask(__name__)
 
 # Secret key je potřeba pro Flask session (přihlášení uživatele)
+# Pro školní projekt stačí natvrdo, v reálné aplikaci by měl být mimo kód.
 app.secret_key = "tajny_klic_pro_skolarni_demo"
 
 # Připojení do PostgreSQL databáze
+# Hodnota se bere z proměnné prostředí, výchozí odpovídá Docker Compose.
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql://student:heslo123@db:5432/myapp"
@@ -24,12 +26,13 @@ DATABASE_URL = os.environ.get(
 
 # Přístup k externímu AI API
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://kurim.ithope.eu/v1")
 
 # SQLAlchemy engine – objekt pro komunikaci s databází
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-# Pevně daní uživatelé pro přihlášení
+# Testovací účty
+# Přihlášení je řešeno jednoduše, uživatelé jsou natvrdo v kódu.
 USERS = {
     "student1": "heslo123",
     "student2": "heslo123",
@@ -53,12 +56,13 @@ for i in range(20):
 
 
 # =========================
-# VYTVOŘENÍ TABULKY
+# VYTVOŘENÍ / OPRAVA TABULKY
 # =========================
 
 # Pokud tabulka ještě neexistuje, aplikace ji vytvoří.
+# Pokud existuje starší verze tabulky bez sloupce username,
+# pokusí se ho doplnit pomocí ALTER TABLE.
 with engine.connect() as conn:
-    # vytvoření tabulky
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS prompts (
             id SERIAL PRIMARY KEY,
@@ -68,6 +72,15 @@ with engine.connect() as conn:
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """))
+
+    # Oprava starší databáze – pokud sloupec username ještě neexistuje,
+    # pokusí se ho přidat. Pokud už existuje, chyba se ignoruje.
+    try:
+        conn.execute(text("ALTER TABLE prompts ADD COLUMN username TEXT;"))
+    except Exception:
+        pass
+
+    conn.commit()
 
 
 # =========================
@@ -385,12 +398,11 @@ HTML_PAGE = """
     </div>
 
     <div class="card" style="margin-top: 24px;">
-        <h2>Historie dotazů</h2>
+        <h2>Moje historie dotazů</h2>
         <table>
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Uživatel</th>
                     <th>Dotaz</th>
                     <th>Odpověď</th>
                     <th>Čas</th>
@@ -400,7 +412,6 @@ HTML_PAGE = """
                 {% for item in history %}
                 <tr>
                     <td>{{ item.id }}</td>
-                    <td>{{ item.username }}</td>
                     <td>{{ item.prompt }}</td>
                     <td>{{ item.response }}</td>
                     <td>{{ item.created_at }}</td>
@@ -464,25 +475,26 @@ def call_ai(user_input: str) -> str:
         return f"AI chyba: {str(e)}"
 
 
-def get_history():
+def get_history(username: str):
     """
-    Načte posledních 20 dotazů z databáze.
+    Načte posledních 20 dotazů pouze pro konkrétního uživatele.
+    Tím zajistíme, že student uvidí jen svou vlastní historii.
     """
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT id, username, prompt, response, created_at
+            SELECT id, prompt, response, created_at
             FROM prompts
+            WHERE username = :username
             ORDER BY id DESC
             LIMIT 20
-        """)).fetchall()
+        """), {"username": username}).fetchall()
 
     return [
         {
             "id": row[0],
-            "username": row[1],
-            "prompt": row[2],
-            "response": row[3],
-            "created_at": row[4],
+            "prompt": row[1],
+            "response": row[2],
+            "created_at": row[3],
         }
         for row in rows
     ]
@@ -556,7 +568,7 @@ def index():
     return render_template_string(
         HTML_PAGE,
         answer=None,
-        history=get_history(),
+        history=get_history(session["username"]),
         username=session["username"]
     )
 
@@ -581,7 +593,7 @@ def ask():
     return render_template_string(
         HTML_PAGE,
         answer=answer,
-        history=get_history(),
+        history=get_history(session["username"]),
         username=session["username"]
     )
 
@@ -637,3 +649,5 @@ def ai():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+Až to uložíš, udělej:
