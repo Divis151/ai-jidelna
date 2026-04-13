@@ -58,16 +58,16 @@ for i in range(20):
 
 # Pokud tabulka ještě neexistuje, aplikace ji vytvoří.
 with engine.connect() as conn:
+    # vytvoření tabulky
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS prompts (
             id SERIAL PRIMARY KEY,
-            username TEXT NOT NULL,
+            username TEXT,
             prompt TEXT NOT NULL,
             response TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """))
-    conn.commit()
 
 
 # =========================
